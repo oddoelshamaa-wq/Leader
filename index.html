@@ -46,12 +46,42 @@
         .screen { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* 1. Table Screen */
-        #screen-table { background: linear-gradient(135deg, var(--primary), #8e0000); color: white; align-items: center; justify-content: space-between; padding: 40px 25px; }
+        #screen-table { background: linear-gradient(135deg, var(--primary), #8e0000); color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding: 20px 10px !important; }
+
+        /* 2. إنشاء منطقة تمرير خاصة بالطاولات فقط */
+        .tables-scroll-area {
+            flex: 1; /* تأخذ كل المساحة المتبقية بين العنوان والفوتر */
+            width: 100%;
+            overflow-y: auto; /* السماح بالتمرير العمودي */
+            display: flex;
+            justify-content: center;
+            padding: 15px 5px;
+            -webkit-overflow-scrolling: touch; /* تمرير ناعم جداً على الآيفون والتابلت */
+        }
+
+        /* 3. تعديل الشبكة لتناسب منطقة التمرير */
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 أعمدة */
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+            height: max-content; /* تجعل الشبكة تتمدد حسب عدد الطاولات */
+        }
+
+        /* 4. تجميل شكل السكرول (اختياري) */
+        .tables-scroll-area::-webkit-scrollbar {
+            width: 4px;
+        }
+        .tables-scroll-area::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
         .table-title { text-align: center; margin-bottom: 30px; }
         .table-title h1 { font-size: 38px; font-weight: 900; text-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         
         .table-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; max-width: 420px; }
-        .table-btn { background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); color: white; padding: 25px 0; border-radius: 20px; font-size: 32px; font-weight: 800; cursor: pointer; backdrop-filter: blur(5px); transition: 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); position: relative; }
+        .table-btn { background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); color: white; padding: 25px 0; border-radius: 20px; font-size: 32px; font-weight: 800; cursor: pointer; backdrop-filter: blur(5px); transition: 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100px; gap: 4px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); position: relative; }
         .table-btn:active { transform: scale(0.95); }
         .table-btn.locked { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); cursor: pointer; }
         .table-btn.locked:active { transform: scale(0.95); background: rgba(183, 28, 28, 0.5); }
@@ -138,7 +168,9 @@
             <div style="font-size:16px; opacity:0.8; margin-bottom:5px;">أهلاً بك في</div>
             <h1>شيخ البلد</h1>
         </div>
-        <div class="table-grid" id="tables-container"></div>
+        <div class="tables-scroll-area">
+            <div class="table-grid" id="tables-container"></div>
+        </div>
         <div style="font-size:12px; opacity:0.7; margin-top:20px;">اضغط على الطاولة للبدء أو الإدارة</div>
     </div>
 
@@ -271,15 +303,43 @@
 
         // Function to generate HTML for a table button
         function generateTableButton(t, badge, tables) {
-            const tableId = t.id || Object.keys(tables).find(key => tables[key] === t); // إذا لم يجد id يستخدم المفتاح (Key)
+            const tableId = t.id || Object.keys(tables).find(key => tables[key] === t);
+
+            // حساب المؤقت إذا كانت الطاولة مشغولة
+            let timerHtml = '';
+            if (t.occupied && t.startTime) {
+                timerHtml = `<div class="table-timer" data-start="${t.startTime}" style="font-size: 11px; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 10px; margin-top: 5px; color: #fff;">0 دقيقة</div>`;
+            }
+
             return `
                 <div class="table-btn ${t.occupied ? 'locked' : ''}"
                      onclick="window.app.handleTableClick(${tableId}, ${t.occupied})">
                     ${badge}
-                    ${t.occupied ? '<i class="fas fa-lock"></i>' : '<i class="fas fa-chair"></i>'} ${t.name || tableId}
+                    ${t.occupied ? '<i class="fas fa-lock"></i>' : '<i class="fas fa-chair"></i>'}
+                    <span style="font-size: 18px;">${t.name || tableId}</span>
+                    ${timerHtml}
                 </div>
             `;
         }
+
+        function updateTablesLiveTimers() {
+            const now = Date.now();
+            document.querySelectorAll('.table-timer').forEach(el => {
+                const startTime = parseInt(el.getAttribute('data-start'));
+                if (startTime) {
+                    const diffInMinutes = Math.floor((now - startTime) / 60000);
+                    el.innerText = diffInMinutes + ' دقيقة';
+
+                    // تغيير لون الوقت لو الطاولة تأخرت (مثلاً أكثر من 60 دقيقة)
+                    if (diffInMinutes >= 60) {
+                        el.style.background = "#b71c1c"; // أحمر
+                    }
+                }
+            });
+        }
+
+        // تحديث العداد كل 30 ثانية
+        setInterval(updateTablesLiveTimers, 30000);
 
         // --- Render Tables with Status Badges ---
         onValue(ref(db, 'tables'), async s => {
@@ -304,6 +364,9 @@
 
                 return generateTableButton(t, badge, tables);
             }).join('');
+
+            // استدعاء الوظيفة أيضاً فور تحميل البيانات لضمان ظهور الوقت فوراً
+            updateTablesLiveTimers();
         });
 
         // --- Load Menu Data ---
@@ -617,7 +680,10 @@
                 }
 
                 // 2. افتح الطاولة في كل الأحوال
-                await update(ref(db, `tables/${selectedTable}`), { occupied: false });
+                await update(ref(db, `tables/${selectedTable}`), {
+                    occupied: false,
+                    startTime: null // تصفير المؤقت
+                });
 
                 showToast('تمت التسوية وفتح الطاولة');
                 window.closeCart();
