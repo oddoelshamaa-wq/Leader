@@ -8,9 +8,47 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
         <style>
             :root { --bg: #121212; --card: #1e1e1e; --primary: #b71c1c; --warning: #f57f17; --success: #2e7d32; }
-            body { font-family: 'Tajawal', sans-serif; background: var(--bg); color: #eee; padding: 20px; }
+            body { font-family: 'Tajawal', sans-serif; background: var(--bg); color: #eee; }
             .header { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; }
-            .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+
+            /* 1. تعديل الحاوية الكبيرة للشاشة */
+            #screen-table {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden; /* نمنع الصفحة كلها من الاهتزاز */
+                padding: 20px 10px !important; /* تقليل البادينج قليلاً للموبايل */
+            }
+
+            /* 2. إنشاء منطقة تمرير خاصة بالطاولات فقط */
+            .tables-scroll-area {
+                flex: 1; /* تأخذ كل المساحة المتبقية بين العنوان والفوتر */
+                width: 100%;
+                overflow-y: auto; /* السماح بالتمرير العمودي */
+                display: flex;
+                justify-content: center;
+                padding: 15px 5px;
+                -webkit-overflow-scrolling: touch; /* تمرير ناعم جداً على الآيفون والتابلت */
+            }
+
+            /* 3. تعديل الشبكة لتناسب منطقة التمرير */
+            .table-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr); /* 3 أعمدة */
+                gap: 15px;
+                width: 100%;
+                max-width: 500px;
+                height: max-content; /* تجعل الشبكة تتمدد حسب عدد الطاولات */
+            }
+
+            /* 4. تجميل شكل السكرول (اختياري) */
+            .tables-scroll-area::-webkit-scrollbar {
+                width: 4px;
+            }
+            .tables-scroll-area::-webkit-scrollbar-thumb {
+                background: rgba(255,255,255,0.2);
+                border-radius: 10px;
+            }
             
             .ticket { background: var(--card); padding: 20px; border-radius: 8px; border-top: 5px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
             .ticket.new { border-color: var(--primary); } .ticket.cooking { border-color: var(--warning); } .ticket.ready { border-color: var(--success); }
@@ -20,20 +58,31 @@
             
             #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; }
             #lock-screen.active { display: flex; }
+
+            @keyframes blink {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
+            }
         </style>
     </head>
     <body>
 
-        <div id="lock-screen">
-            <i class="fas fa-lock" style="font-size:50px; color:var(--danger); margin-bottom:20px;"></i>
-            <h2>النظام مغلق مؤقتاً</h2>
-        </div>
+        <div id="screen-table">
+            <div id="lock-screen">
+                <i class="fas fa-lock" style="font-size:50px; color:var(--danger); margin-bottom:20px;"></i>
+                <h2>النظام مغلق مؤقتاً</h2>
+            </div>
 
-        <div class="header">
-            <h1 style="color:var(--primary)">المطبخ</h1>
-            <p id="clock" style="opacity:0.6"></p>
+            <div class="header">
+                <h1 style="color:var(--primary)">المطبخ</h1>
+                <p id="clock" style="opacity:0.6"></p>
+            </div>
+
+            <div class="tables-scroll-area">
+                <div class="table-grid" id="orders-container"></div>
+            </div>
         </div>
-        <div class="grid" id="orders-container"></div>
 
         <script>
             // 1. منع القائمة اليمنى (Right Click)
@@ -157,7 +206,12 @@
                             <span>طلب #${orderIdDisplay}</span>
                         </div>
                         <div style="font-size:12px; color:#aaa; margin-bottom:15px; display:flex; justify-content:space-between;">
+                        <div style="display:flex; flex-direction:column; gap:2px;">
                             <span>${o.time || '--:--'}</span>
+                            <span class="live-timer" data-start="${o.timestamp || o.id}" style="color:var(--warning); font-weight:bold; font-size:14px;">
+                                جاري الحساب...
+                            </span>
+                        </div>
                             <span style="font-weight:bold;">${statusText}</span>
                         </div>
 
@@ -231,6 +285,32 @@
 
             const $ = id => document.getElementById(id);
             setInterval(() => $('clock').innerText = new Date().toLocaleTimeString('ar-EG'), 1000);
+
+            // وظيفة لحساب الوقت المنقضي
+            function updateTimers() {
+                const now = Date.now();
+                document.querySelectorAll('.live-timer').forEach(el => {
+                    const startTime = parseInt(el.getAttribute('data-start'));
+                    const diffInSeconds = Math.floor((now - startTime) / 1000);
+                    
+                    const minutes = Math.floor(diffInSeconds / 60);
+                    const seconds = diffInSeconds % 60;
+
+                    // تنسيق الوقت ليظهر بشكل احترافي (مثال 05:09)
+                    const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    
+                    el.innerHTML = `<i class="fas fa-clock"></i> منذ: ${formattedTime}`;
+
+                    // تغيير اللون للأحمر إذا تأخر الطلب أكثر من 15 دقيقة
+                    if (minutes >= 15) {
+                        el.style.color = "#ff4444";
+                        el.style.animation = "blink 1s infinite"; // إضافة وميض للطلبات المتأخرة
+                    }
+                });
+            }
+
+            // تشغيل التحديث كل ثانية واحدة
+            setInterval(updateTimers, 1000);
         </script>
     </body>
     </html>
