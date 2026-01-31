@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>طلب - شيخ البلد (نسخة الإدارة)</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { 
+            --primary: #b71c1c; 
+            --primary-light: #ffebef;
+            --text: #1f2937;
+            --text-light: #9ca3af;
+            --bg: #f9fafb;
+            --surface: #ffffff;
+            --radius: 16px;
+            --shadow: 0 10px 30px rgba(0,0,0,0.06);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Tajawal', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text); height: 100vh; overflow-x: hidden; }
+
+        /* --- Lock Screen (Maintenance) --- */
+        #maintenance-screen { position: fixed; inset: 0; background: #000; z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; }
+        #maintenance-screen.active { display: flex; }
+        .lock-icon { font-size: 70px; color: var(--primary); margin-bottom: 20px; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-20px);} 60% {transform: translateY(-10px);} }
+
+        /* --- Toast Notification --- */
+        #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px); background: #10b981; color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; opacity: 0; transition: 0.3s; z-index: 2000; white-space: nowrap; box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); font-weight: bold; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* --- PIN Modal --- */
+        .pin-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .pin-box { background: white; padding: 30px; border-radius: 20px; width: 80%; max-width: 320px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .pin-input { width: 100%; padding: 15px; margin: 20px 0; font-size: 24px; text-align: center; border: 2px solid #eee; border-radius: 12px; outline: none; letter-spacing: 5px; }
+        .pin-input:focus { border-color: var(--primary); }
+        .pin-actions { display: flex; gap: 10px; }
+        .btn-pin { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-cancel { background: #f3f4f6; color: #666; }
+        .btn-confirm { background: var(--primary); color: white; }
+
+        /* --- Screens --- */
+        .screen { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* 1. Table Screen */
+        #screen-table { background: linear-gradient(135deg, var(--primary), #8e0000); color: white; align-items: center; justify-content: space-between; padding: 40px 25px; }
+        .table-title { text-align: center; margin-bottom: 30px; }
+        .table-title h1 { font-size: 38px; font-weight: 900; text-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        
+        .table-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; max-width: 420px; }
+        .table-btn { background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); color: white; padding: 25px 0; border-radius: 20px; font-size: 32px; font-weight: 800; cursor: pointer; backdrop-filter: blur(5px); transition: 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); position: relative; }
+        .table-btn:active { transform: scale(0.95); }
+        .table-btn.locked { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); cursor: pointer; }
+        .table-btn.locked:active { transform: scale(0.95); background: rgba(183, 28, 28, 0.5); }
+        .badge-qty { position: absolute; top: -5px; right: -5px; background: #fbbf24; color: #000; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+        /* 2. Menu Screen */
+        #screen-menu { display: none; background: var(--bg); }
+        
+        header { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); padding: 15px 20px; position: sticky; top: 0; z-index: 20; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .header-info { display: flex; flex-direction: column; }
+        .table-badge { background: var(--primary-light); color: var(--primary); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; display: inline-block; margin-top: 2px; }
+
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 15px 20px; background: white; scrollbar-width: none; }
+        .categories::-webkit-scrollbar { display: none; }
+        .cat-chip { background: #f3f4f6; color: var(--text); padding: 8px 20px; border-radius: 30px; font-weight: bold; font-size: 14px; white-space: nowrap; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+        .cat-chip.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(183, 28, 28, 0.2); }
+
+        .menu-scroll { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 90px; }
+        .food-card { background: white; border-radius: 20px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.04); display: flex; gap: 15px; padding: 10px; border: 1px solid #f3f4f6; transition: 0.2s; }
+        .food-img { width: 100px; height: 100px; border-radius: 16px; object-fit: cover; flex-shrink: 0; background: #eee; }
+        .food-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .food-name { font-size: 16px; font-weight: 800; color: var(--text); line-height: 1.4; }
+        .food-cat { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+        .food-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .food-price { font-size: 18px; font-weight: 900; color: var(--primary); }
+        .add-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: white; border: none; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(183, 28, 28, 0.3); cursor: pointer; }
+        .add-btn:active { transform: scale(0.85); }
+
+        .cart-bar { position: fixed; bottom: 25px; left: 20px; right: 20px; background: var(--surface); padding: 15px 25px; border-radius: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); display: none; justify-content: space-between; align-items: center; z-index: 100; animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 1px solid rgba(0,0,0,0.05); }
+        .cart-total-box { text-align: right; }
+        .cart-total-label { font-size: 11px; color: var(--text-light); font-weight: bold; }
+        .cart-total-val { font-size: 18px; font-weight: 900; color: var(--primary); }
+        .cart-btn { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 30px; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 5px 15px rgba(183, 28, 28, 0.3); }
+        .badge { background: white; color: var(--primary); font-size: 11px; width: 20px; height: 20px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: 900; }
+        @keyframes popUp { from {transform: translateY(50px) scale(0.9); opacity: 0;} to {transform: translateY(0) scale(1); opacity: 1;} }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; display: none; justify-content: flex-end; backdrop-filter: blur(4px); }
+        .modal-content { background: white; width: 100%; height: 88vh; border-radius: 30px 30px 0 0; padding: 25px; display: flex; flex-direction: column; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.2); }
+        @keyframes slideUp { from {transform: translateY(100%);} to {transform: translateY(0);} }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f3f4f6; }
+        .cart-items { flex: 1; overflow-y: auto; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px dashed #eee; }
+        .cart-item-info strong { display: block; font-size: 15px; margin-bottom: 4px; }
+        .cart-item-info small { color: var(--text-light); }
+        .cart-item-price { font-weight: 900; color: var(--primary); font-size: 16px; }
+        .item-controls { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+        .qty-btn { width: 25px; height: 25px; border-radius: 5px; border: 1px solid #ddd; background: #fff; color: #333; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        
+        .checkout-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 15px; font-size: 18px; font-weight: bold; margin-top: 20px; display: flex; justify-content: center; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 10px 20px rgba(183, 28, 28, 0.3); }
+        .settle-btn { width: 100%; background: #10b981; color: white; border: none; padding: 18px; border-radius: 15px; font-size: 18px; font-weight: bold; margin-top: 15px; display: none; justify-content: center; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3); }
+
+    </style>
+</head>
+<body>
+
+    <!-- Maintenance Lock Screen -->
+    <div id="maintenance-screen">
+        <i class="fas fa-lock lock-icon"></i>
+        <h2 style="margin-bottom:10px; font-size:24px;">النظام مغلق مؤقتاً</h2>
+        <p id="maintenance-reason" style="max-width:80%; color:#ccc;">يرجى التواصل مع الإدارة</p>
+    </div>
+
+    <!-- Admin PIN Modal -->
+    <div class="pin-modal-overlay" id="pin-modal">
+        <div class="pin-box">
+            <i class="fas fa-user-shield" style="font-size: 40px; color: var(--primary); margin-bottom: 15px;"></i>
+            <h3>تسجيل دخول الموظف</h3>
+            <p style="font-size:12px; color:#777; margin-top:5px;">لإدارة طاولة مشغولة</p>
+            <input type="tel" id="pin-input" class="pin-input" placeholder="0000" maxlength="4">
+            <div class="pin-actions">
+                <button class="btn-pin btn-cancel" onclick="closePin()">إلغاء</button>
+                <button class="btn-pin btn-confirm" onclick="checkPin()">دخول</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast">تمت الإضافة للسلة</div>
+
+    <!-- Screen 1: Table Selection -->
+    <div id="screen-table" class="screen">
+        <div class="table-title">
+            <div style="font-size:16px; opacity:0.8; margin-bottom:5px;">أهلاً بك في</div>
+            <h1>شيخ البلد</h1>
+        </div>
+        <div class="table-grid" id="tables-container"></div>
+        <div style="font-size:12px; opacity:0.7; margin-top:20px;">اضغط على الطاولة للبدء أو الإدارة</div>
+    </div>
+
+    <!-- Screen 2: Menu -->
+    <div id="screen-menu" class="screen">
+        <header>
+            <button onclick="exitTable()" style="background:none; border:none; color:var(--primary); font-weight:bold; font-size:15px; display:flex; align-items:center; gap:5px;">
+                <i class="fas fa-arrow-right"></i> خروج
+            </button>
+            <div class="header-info" style="text-align:center; flex:1;">
+                <span style="font-size:12px; color:var(--text-light);">طاولتك الحالية</span>
+                <span class="table-badge" id="display-table-no">--</span>
+            </div>
+            <div style="width: 40px;"></div> <!-- Spacer -->
+        </header>
+
+        <div class="categories" id="categories-container">
+            <div class="cat-chip active" onclick="filterMenu('all')">الكل</div>
+        </div>
+
+        <div class="menu-scroll" id="menu-list"></div>
+
+        <div class="cart-bar" id="floating-cart">
+            <div class="cart-total-box">
+                <span class="cart-total-label">الإجمالي</span>
+                <span class="cart-total-val" id="total-price">0 ج.م</span>
+            </div>
+            <button class="cart-btn" onclick="openCart()">
+                الفاتورة
+                <span class="badge" id="cart-count">0</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Cart/Order Modal -->
+    <div class="modal-overlay" id="cart-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="font-size:20px;">تفاصيل الفاتورة</h3>
+                <button onclick="closeCart()" style="background:none; border:none; font-size:24px; color:#999;">&times;</button>
+            </div>
+            <div class="cart-items" id="cart-list"></div>
+            
+            <!-- Action Buttons -->
+            <div style="margin-top: auto;">
+                <button class="checkout-btn" id="update-order-btn" onclick="updateOrder()">
+                    <i class="fas fa-save"></i> تحديث الفاتورة
+                </button>
+                <button class="settle-btn" id="settle-btn" onclick="settleTable()">
+                    <i class="fas fa-check-double"></i> تسوية الحساب وتفعيل الطاولة
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. منع القائمة اليمنى (Right Click)
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // 2. منع اختصارات لوحة التحكم (F12, Ctrl+Shift+I, Ctrl+U)
+        document.onkeydown = function(e) {
+            // منع F12
+            if (e.keyCode == 123) return false;
+
+            // منع Ctrl+Shift+I (Inspect)
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+
+            // منع Ctrl+Shift+J (Console)
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+
+            // منع Ctrl+U (View Source)
+            if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+
+            // منع Ctrl+S (Save Page)
+            if (e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false;
+        };
+
+        // 3. تعطيل خاصية السحب والإفلات للصور (لحماية صور المنيو)
+        document.addEventListener('dragstart', event => event.preventDefault());
+
+        // تحذير في الكونسول
+        setInterval(() => {
+            console.clear();
+            console.log("%cتحذير!", "color: red; font-size: 50px; font-weight: bold;");
+            console.log("%cهذه المنطقة مخصصة للمطورين فقط. محاولة الدخول غير المصرح به تعرضك للمساءلة القانونية.", "font-size: 20px;");
+        }, 1000);
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, get, push, onValue, update, query, orderByChild, equalTo, set, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1J7lSkqHHShPlkvtIUwpgmgsGqJ1uhJQ",
+            authDomain: "sheikh-pro-61502.firebaseapp.com",
+            projectId: "sheikh-pro-61502",
+            storageBucket: "sheikh-pro-61502.firebasestorage.app",
+            messagingSenderId: "388665698743",
+            appId: "1:388665698743:web:7eca2bfc0223f9c1736032",
+            measurementId: "G-5F3J5S68LP"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- State Variables ---
+        let cart = [];
+        let selectedTable = null;
+        let globalMenu = [];
+        let allCategories = [];
+        
+        // Mode: 'new' (customer) or 'edit' (staff)
+        let currentMode = 'new'; 
+        let currentOrderKey = null; // To store Firebase key of the order being edited
+
+        const $ = id => document.getElementById(id);
+
+        let allTables = {}; // Global variable to store tables data
+
+        // --- Listeners ---
+        onValue(ref(db, 'config'), (snap) => {
+            const conf = snap.val();
+            if(conf && conf.locked) {
+                $('maintenance-screen').classList.add('active');
+                $('maintenance-reason').innerText = conf.reason || 'مغلق للصيانة';
+            } else {
+                $('maintenance-screen').classList.remove('active');
+            }
+        });
+
+        // Function to generate HTML for a table button
+        function generateTableButton(t, badge, tables) {
+            const tableId = t.id || Object.keys(tables).find(key => tables[key] === t); // إذا لم يجد id يستخدم المفتاح (Key)
+            return `
+                <div class="table-btn ${t.occupied ? 'locked' : ''}"
+                     onclick="window.app.handleTableClick(${tableId}, ${t.occupied})">
+                    ${badge}
+                    ${t.occupied ? '<i class="fas fa-lock"></i>' : '<i class="fas fa-chair"></i>'} ${t.name || tableId}
+                </div>
+            `;
+        }
+
+        // --- Render Tables with Status Badges ---
+        onValue(ref(db, 'tables'), async s => {
+            const tables = s.val() || {};
+            allTables = tables; // Update global tables data
+            
+            // Fetch all pending orders to show item counts on tables
+            const ordersSnap = await get(ref(db, 'orders'));
+            const orders = ordersSnap.val() || {};
+            
+            // Helper to get count
+            const getItemCount = (tableId) => {
+                const order = Object.values(orders).find(o => o.tableId == tableId && o.status === 'pending');
+                if(!order) return 0;
+                return order.items.reduce((acc, item) => acc + item.qty, 0);
+            };
+
+            // Generate HTML for each table button
+            $('tables-container').innerHTML = Object.values(tables).map(t => {
+                const count = getItemCount(t.id);
+                const badge = count > 0 ? `<span class="badge-qty">${count}</span>` : '';
+
+                return generateTableButton(t, badge, tables);
+            }).join('');
+        });
+
+        // --- Load Menu Data ---
+        async function initMenu() {
+            // 1. استلام المنيو
+            const mSnap = await get(ref(db, 'menu'));
+            globalMenu = mSnap.val() || [];
+
+            // 2. استلام الأقسام من جدول الأقسام (وليس من المنيو)
+            onValue(ref(db, 'categories'), s => {
+                const data = s.val();
+                // تحويل البيانات لمصفوفة لضمان العرض
+                allCategories = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+
+                console.log("الأقسام التي وصلت للزبون:", allCategories); // عشان نتأكد في الكونسول
+
+                renderCategories(); // رسم الأزرار
+                renderMenu('all');   // رسم المنيو
+            });
+        }
+        initMenu();
+
+        // --- Handle Table Click (New vs Edit) ---
+        window.app = {
+            handleTableClick: (id, isOccupied) => {
+                if (!isOccupied) {
+                    // New Customer Flow
+                    startOrder(id, 'new');
+                } else {
+                    // Staff/Admin Flow
+                    openPinModal(id);
+                }
+            },
+            
+            addToCart: (id) => {
+                const item = globalMenu.find(i => i.id === id);
+                const exist = cart.find(c => c.id === id);
+                if(exist) exist.qty++; 
+                else cart.push({...item, qty:1});
+                
+                updateCartUI();
+                showToast();
+            },
+
+            changeQty: (id, delta) => {
+                const idx = cart.findIndex(c => c.id === id);
+                if(idx === -1) return;
+                cart[idx].qty += delta;
+                if(cart[idx].qty <= 0) cart.splice(idx, 1);
+                updateCartUI();
+            }
+        };
+
+        window.addNewTable = async () => {
+            if(!confirm("هل تريد إضافة طاولة جديدة؟")) return;
+            const keys = Object.keys(allTables).map(Number);
+            const nextId = keys.length > 0 ? Math.max(...keys) + 1 : 1;
+
+            // استخدم set لضمان إنشاء مسار نظيف للطاولة
+            await set(ref(db, `tables/${nextId}`), {
+                id: nextId,
+                name: `${nextId}`, // الاسم الافتراضي هو الرقم
+                occupied: false,
+                total: 0
+            });
+        };
+
+        window.deleteTable = async (id) => {
+            // 1. التأكد من الصلاحية
+            if (!currentUser || (currentUser.role !== 'super-admin' && currentUser.username !== 'admin')) {
+                return alert("⚠️ عذراً، حذف الطاولات متاح فقط للمالك (Super Admin)");
+            }
+
+            // 2. طلب تأكيد
+            if(!confirm(`هل أنت متأكد من حذف هذه الطاولة نهائياً؟`)) return;
+
+            try {
+                // 3. الحذف المباشر باستخدام المسار الصحيح
+                await remove(ref(db, `tables/${id}`));
+                alert("🗑️ تم الحذف بنجاح");
+            } catch (e) {
+                console.error(e);
+                alert("❌ فشل الحذف: " + e.message);
+            }
+        };
+
+        // --- PIN Logic ---
+        let tempTableId = null;
+        function openPinModal(id) {
+            tempTableId = id;
+            $('pin-input').value = '';
+            $('pin-modal').style.display = 'flex';
+            $('pin-input').focus();
+        }
+
+        window.closePin = () => $('pin-modal').style.display = 'none';
+
+        window.checkPin = () => {
+            const pin = $('pin-input').value;
+            if(pin === '1234') { // Default Admin PIN
+                window.closePin();
+                loadExistingOrder(tempTableId);
+            } else {
+                alert('كلمة المرور خاطئة!');
+            }
+        };
+
+        // --- Load Existing Order (Edit Mode) ---
+        async function loadExistingOrder(tableId) {
+            const ordersSnap = await get(ref(db, 'orders'));
+            const orders = ordersSnap.val() || {};
+
+            // البحث عن الطلب الخاص بالطاولة (بشرط ألا يكون قد دفع 'paid')
+            // سنبحث عن أي حالة غير 'paid' لضمان ظهور الطلب حتى لو "استلام"
+            const targetOrderKey = Object.keys(orders).find(key => {
+                const order = orders[key];
+                return String(order.tableId) === String(tableId) && order.status !== 'paid';
+            });
+
+            if(targetOrderKey) {
+                currentOrderKey = targetOrderKey;
+                // التأكد أن المنتجات موجودة وتحويلها لمصفوفة لو كانت مخزنة بشكل مختلف
+                const savedItems = orders[targetOrderKey].items;
+                cart = Array.isArray(savedItems) ? savedItems : Object.values(savedItems || {});
+                currentMode = 'edit';
+            } else {
+                // إذا لم يجد طلب نشط، يصفر السلة ويفتح وضع التعديل لتصفير الطاولة
+                currentOrderKey = null;
+                cart = [];
+                currentMode = 'edit';
+                alert('تنبيه: لا يوجد طلبات نشطة مسجلة لهذه الطاولة حالياً.');
+            }
+
+            startOrderUI(tableId);
+            updateCartUI(); // تحديث الواجهة فوراً
+        }
+
+        function startOrder(id, mode) {
+            currentMode = mode;
+            cart = []; // Clear cart for new order
+            currentOrderKey = null;
+            startOrderUI(id);
+        }
+
+        function startOrderUI(id) {
+            selectedTable = id;
+            $('screen-table').style.display = 'none';
+            $('screen-menu').style.display = 'flex';
+            $('display-table-no').innerText = id;
+            updateCartUI();
+        }
+
+        // --- Menu & Categories ---
+        function renderCategories() {
+            const container = $('categories-container');
+            // الزرار الأساسي
+            let html = `<div class="cat-chip active" onclick="window.filterMenu('all')" id="cat-all">الكل</div>`;
+
+            // رسم الأقسام اللي أنت ضفتها في لوحة التحكم
+            allCategories.forEach(c => {
+                if(c) {
+                    html += `<div class="cat-chip" onclick="window.filterMenu('${c}')" id="cat-${c}">${c}</div>`;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        window.filterMenu = (category) => {
+            document.querySelectorAll('.cat-chip').forEach(el => el.classList.remove('active'));
+            $(`cat-${category}`).classList.add('active');
+            renderMenu(category);
+        };
+
+        function renderMenu(filterCat) {
+            const items = filterCat === 'all' 
+                ? globalMenu 
+                : globalMenu.filter(i => i.cat === filterCat);
+
+            $('menu-list').innerHTML = items.filter(i => i.available).map(i => `
+                <div class="food-card">
+                    <img src="${i.img || 'https://via.placeholder.com/150'}" class="food-img">
+                    <div class="food-info">
+                        <div>
+                            <div class="food-name">${i.name}</div>
+                            <div class="food-cat">${i.cat}</div>
+                        </div>
+                        <div class="food-bottom">
+                            <span class="food-price">${i.price} ج.م</span>
+                            <button class="add-btn" onclick="window.app.addToCart(${i.id})"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- Cart UI ---
+        function updateCartUI() {
+            const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
+            const count = cart.reduce((s,i)=>s+i.qty,0);
+            $('total-price').innerText = total + ' ج.م';
+            $('cart-count').innerText = count;
+
+            // جعل شريط الفاتورة يظهر دائماً للموظف حتى لو السلة فارغة
+            if(currentMode === 'edit') {
+                $('floating-cart').style.display = 'flex';
+            } else {
+                $('floating-cart').style.display = cart.length > 0 ? 'flex' : 'none';
+            }
+
+            $('cart-list').innerHTML = cart.map(i => `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <strong>${i.name}</strong>
+                        <div class="item-controls">
+                            <button class="qty-btn" onclick="window.app.changeQty(${i.id}, -1)">-</button>
+                            <span style="font-size:14px; font-weight:bold; min-width:20px; text-align:center;">${i.qty}</span>
+                            <button class="qty-btn" onclick="window.app.changeQty(${i.id}, 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="cart-item-price">${i.price * i.qty} ج.م</div>
+                </div>
+            `).join('');
+
+            if(currentMode === 'edit') {
+                $('update-order-btn').style.display = 'flex';
+                $('settle-btn').style.display = 'flex'; // زر الحساب يظهر هنا
+                $('update-order-btn').innerHTML = `<i class="fas fa-sync"></i> تحديث الطلب`;
+            } else {
+                $('update-order-btn').style.display = 'flex';
+                $('settle-btn').style.display = 'none';
+                $('update-order-btn').innerHTML = `<i class="fas fa-paper-plane"></i> إرسال الطلب للمطبخ`;
+            }
+        }
+
+        function showToast(msg = 'تمت الإضافة للسلة') {
+            const toast = $('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        // --- Actions ---
+        window.openCart = () => { updateCartUI(); $('cart-modal').style.display = 'flex'; };
+        window.closeCart = () => $('cart-modal').style.display = 'none';
+        window.exitTable = () => {
+            $('screen-menu').style.display = 'none';
+            $('screen-table').style.display = 'flex';
+            cart = []; 
+            currentOrderKey = null;
+            updateCartUI();
+        };
+
+        // Create New Order (Customer)
+        async function createNewOrder() {
+            const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
+            const newOrderRef = await push(ref(db, 'orders'), {
+                id: Date.now(), 
+                tableId: selectedTable, 
+                items: cart, 
+                status: 'pending', 
+                time: new Date().toLocaleTimeString('ar-EG'), 
+                total, 
+                type: 'client'
+            });
+
+            // Lock Table
+            await update(ref(db, `tables/${selectedTable}`), { occupied: true });
+            
+            currentOrderKey = newOrderRef.key; // Save key just in case
+        }
+
+        // Update Existing Order (Staff)
+        async function modifyExistingOrder() {
+            const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
+            await update(ref(db, `orders/${currentOrderKey}`), {
+                items: cart,
+                total: total,
+                time: new Date().toLocaleTimeString('ar-EG') + ' (معدل)'
+            });
+        }
+
+        window.updateOrder = async () => {
+            if(cart.length === 0) return alert('السلة فارغة!');
+            
+            try {
+                if (currentMode === 'new') {
+                    await createNewOrder();
+                    showToast('✅ تم إرسال الطلب للمطبخ');
+                } else {
+                    await modifyExistingOrder();
+                    showToast('✅ تم تحديث الفاتورة');
+                }
+                window.closeCart();
+            } catch(e) {
+                console.error(e);
+                alert('حدث خطأ أثناء الحفظ');
+            }
+        };
+
+        window.settleTable = async () => {
+            if(!confirm('هل أنت متأكد من تسوية الحساب وتفعيل الطاولة؟')) return;
+
+            try {
+                // 1. إذا كان هناك طلب، حوله لـ "مدفوع"
+                if (currentOrderKey) {
+                    await update(ref(db, `orders/${currentOrderKey}`), {
+                        status: 'paid',
+                        paidAt: new Date().toLocaleTimeString('ar-EG')
+                    });
+                }
+
+                // 2. افتح الطاولة في كل الأحوال
+                await update(ref(db, `tables/${selectedTable}`), { occupied: false });
+
+                showToast('تمت التسوية وفتح الطاولة');
+                window.closeCart();
+                window.exitTable();
+            } catch(e) {
+                console.error(e);
+                alert('خطأ في الاتصال بقاعدة البيانات');
+            }
+        };
+
+    </script>
+</body>
+</html>
