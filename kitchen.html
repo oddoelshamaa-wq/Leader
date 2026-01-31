@@ -1,0 +1,236 @@
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>المطبخ - شيخ البلد</title>
+        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <style>
+            :root { --bg: #121212; --card: #1e1e1e; --primary: #b71c1c; --warning: #f57f17; --success: #2e7d32; }
+            body { font-family: 'Tajawal', sans-serif; background: var(--bg); color: #eee; padding: 20px; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+            
+            .ticket { background: var(--card); padding: 20px; border-radius: 8px; border-top: 5px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+            .ticket.new { border-color: var(--primary); } .ticket.cooking { border-color: var(--warning); } .ticket.ready { border-color: var(--success); }
+            
+            .ticket-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; color: var(--primary); }
+            .btn { flex: 1; padding: 12px; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+            
+            #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; }
+            #lock-screen.active { display: flex; }
+        </style>
+    </head>
+    <body>
+
+        <div id="lock-screen">
+            <i class="fas fa-lock" style="font-size:50px; color:var(--danger); margin-bottom:20px;"></i>
+            <h2>النظام مغلق مؤقتاً</h2>
+        </div>
+
+        <div class="header">
+            <h1 style="color:var(--primary)">المطبخ</h1>
+            <p id="clock" style="opacity:0.6"></p>
+        </div>
+        <div class="grid" id="orders-container"></div>
+
+        <script>
+            // 1. منع القائمة اليمنى (Right Click)
+            document.addEventListener('contextmenu', event => event.preventDefault());
+
+            // 2. منع اختصارات لوحة التحكم (F12, Ctrl+Shift+I, Ctrl+U)
+            document.onkeydown = function(e) {
+                // منع F12
+                if (e.keyCode == 123) return false;
+
+                // منع Ctrl+Shift+I (Inspect)
+                if (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+
+                // منع Ctrl+Shift+J (Console)
+                if (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+
+                // منع Ctrl+U (View Source)
+                if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+
+                // منع Ctrl+S (Save Page)
+                if (e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false;
+            };
+
+            // 3. تعطيل خاصية السحب والإفلات للصور (لحماية صور المنيو)
+            document.addEventListener('dragstart', event => event.preventDefault());
+
+            // تحذير في الكونسول
+            setInterval(() => {
+                console.clear();
+                console.log("%cتحذير!", "color: red; font-size: 50px; font-weight: bold;");
+                console.log("%cهذه المنطقة مخصصة للمطورين فقط. محاولة الدخول غير المصرح به تعرضك للمساءلة القانونية.", "font-size: 20px;");
+            }, 1000);
+        </script>
+
+        <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+            import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyB1J7lSkqHHShPlkvtIUwpgmgsGqJ1uhJQ",
+                authDomain: "sheikh-pro-61502.firebaseapp.com",
+                projectId: "sheikh-pro-61502",
+                storageBucket: "sheikh-pro-61502.firebasestorage.app",
+                messagingSenderId: "388665698743",
+                appId: "1:388665698743:web:7eca2bfc0223f9c1736032",
+                measurementId: "G-5F3J5S68LP"
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const db = getDatabase(app);
+
+            // Lock Listener
+            onValue(ref(db, 'config'), (snap) => {
+                const conf = snap.val();
+                if(conf && conf.locked) $('lock-screen').classList.add('active');
+                else $('lock-screen').classList.remove('active');
+            });
+
+            // استماع للطلبات
+            onValue(ref(db, 'orders'), (snap) => {
+                const data = snap.val();
+                if (!data) {
+                    document.getElementById('orders-container').innerHTML = '<h2 style="text-align:center;width:100%;opacity:0.5;">لا توجد طلبات حالياً</h2>';
+                    return;
+                }
+
+                // تحويل الكائن لمصفوفة وفلترة الطلبات اللي لسه مخلصتش
+                const activeOrders = Object.entries(data)
+                    .map(([key, value]) => ({ ...value, key }))
+                    .filter(o => o.status !== 'paid' && o.status !== 'served')
+                    .sort((a, b) => b.id - a.id); // الأحدث فوق
+
+                renderOrders(activeOrders);
+            });
+
+            function renderOrders(orders) {
+                const container = $('orders-container');
+
+                if (orders.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:50px; opacity:0.5; color:white;">لا توجد طلبات نشطة حالياً</div>';
+                    return;
+                }
+
+                container.innerHTML = orders.map(o => {
+                    // 1. التأكد من وجود الأصناف (أمان)
+                    const items = o.items || [];
+
+                    // 2. معالجة رقم الطلب بأمان (إصلاح خطأ toString)
+                    const orderIdDisplay = o.id ? o.id.toString().slice(-4) : "0000";
+
+                    // 3. حساب الربح بأمان (إصلاح خطأ reduce)
+                    const orderProfit = items.reduce((sum, item) => {
+                        const price = parseFloat(item.price) || 0;
+                        const cost = parseFloat(item.cost) || 0;
+                        const qty = parseInt(item.qty) || 0;
+                        return sum + ((price - cost) * qty);
+                    }, 0);
+
+                    let statusText = '';
+                    let statusClass = '';
+                    let actionBtn = '';
+
+                    if (o.status === 'pending') {
+                        statusText = 'جديد';
+                        statusClass = 'new';
+                        actionBtn = `<button class="btn" style="background:var(--primary)" onclick="updateOrder('${o.key}', 'cooking')">بدء التحضير <i class="fas fa-fire"></i></button>`;
+                    } else if (o.status === 'cooking') {
+                        statusText = 'جاري التحضير';
+                        statusClass = 'cooking';
+                        actionBtn = `<button class="btn" style="background:var(--warning)" onclick="updateOrder('${o.key}', 'ready')">تم التحضير <i class="fas fa-check-circle"></i></button>`;
+                    } else if (o.status === 'ready') {
+                        statusText = 'جاهز للتقديم';
+                        statusClass = 'ready';
+                        actionBtn = `<button class="btn" style="background:var(--success)" onclick="updateOrder('${o.key}', 'served')">تم التوصيل <i class="fas fa-user-check"></i></button>`;
+                    }
+
+                    return `
+                    <div class="ticket ${statusClass}" id="ticket-${o.key}">
+                        <div class="ticket-header">
+                            <span><i class="fas fa-chair"></i> طاولة ${o.tableId || '?'}</span>
+                            <span>طلب #${orderIdDisplay}</span>
+                        </div>
+                        <div style="font-size:12px; color:#aaa; margin-bottom:15px; display:flex; justify-content:space-between;">
+                            <span>${o.time || '--:--'}</span>
+                            <span style="font-weight:bold;">${statusText}</span>
+                        </div>
+
+                        <div style="min-height:50px;">
+                            ${items.map(i => `
+                                <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #333;">
+                                    <span>${i.name || 'صنف مجهول'}</span>
+                                    <span style="font-weight:bold; color:var(--warning)">x${i.qty || 1}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px dashed #444;">
+                            <div>المجموع: <span style="font-size:18px; font-weight:bold;">${o.total || 0}</span> ج.م</div>
+
+                            <div style="text-align:left;">
+                                <small style="color:#aaa;">الربح</small>
+                                <div style="font-size:16px; font-weight:bold; color:var(--success);">${orderProfit.toFixed(2)} ج.م</div>
+                            </div>
+                        </div>
+
+                        <div class="actions" style="display:flex; gap:10px; margin-top:15px;">${actionBtn}</div>
+                    </div>`;
+                }).join('');
+            }
+
+            window.updateOrder = (orderKey, newStatus) => {
+                const orderRef = ref(db, `orders/${orderKey}`);
+                update(orderRef, { status: newStatus })
+                .then(() => {
+                    console.log("تم تحديث الحالة");
+                })
+                .catch((err) => alert("عفواً حدث خطأ"));
+            };
+
+            async function createNewOrder() {
+                if (cart.length === 0) return alert('السلة فارغة!');
+
+                const total = cart.reduce((s, i) => s + (i.price * i.qty), 0);
+
+                // تجهيز الطلب بالشكل اللي المطبخ بيفهمه
+                const orderData = {
+                    id: Date.now(),
+                    tableId: selectedTable,
+                    items: cart.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        cost: item.cost || 0, // مهم جداً عشان المطبخ يحسب الربح
+                        qty: item.qty
+                    })),
+                    status: 'pending', // الحالة اللي بتخلي الأوردر يظهر في المطبخ
+                    time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+                    date: new Date().toLocaleDateString('ar-EG'),
+                    total: total,
+                    user: 'زبون'
+                };
+
+                try {
+                    // إرسال للمطبخ
+                    await push(ref(db, 'orders'), orderData);
+                    // تحديث حالة الطاولة في لوحة التحكم
+                    await update(ref(db, `tables/${selectedTable}`), { occupied: true });
+
+                    showToast('✅ تم إرسال طلبك للمطبخ');
+                    window.closeCart();
+                } catch (e) {
+                    alert('خطأ في الاتصال: ' + e.message);
+                }
+            }
+
+            const $ = id => document.getElementById(id);
+            setInterval(() => $('clock').innerText = new Date().toLocaleTimeString('ar-EG'), 1000);
+        </script>
+    </body>
+    </html>
