@@ -1,316 +1,303 @@
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>المطبخ - شيخ البلد</title>
-        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-        <style>
-            :root { --bg: #121212; --card: #1e1e1e; --primary: #b71c1c; --warning: #f57f17; --success: #2e7d32; }
-            body { font-family: 'Tajawal', sans-serif; background: var(--bg); color: #eee; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم المطبخ - شيخ البلد</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { 
+            --bg: #0f1011; 
+            --card: #1c1e21; 
+            --primary: #d32f2f; 
+            --warning: #ffa000; 
+            --success: #388e3c; 
+            --text-main: #ffffff;
+            --text-sub: #b0b3b8;
+        }
 
-            /* 1. تعديل الحاوية الكبيرة للشاشة */
-            #screen-table {
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden; /* نمنع الصفحة كلها من الاهتزاز */
-                padding: 20px 10px !important; /* تقليل البادينج قليلاً للموبايل */
-            }
+        body { 
+            font-family: 'Tajawal', sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            margin: 0;
+            overflow: hidden;
+        }
 
-            /* 2. إنشاء منطقة تمرير خاصة بالطاولات فقط */
-            .tables-scroll-area {
-                flex: 1; /* تأخذ كل المساحة المتبقية بين العنوان والفوتر */
-                width: 100%;
-                overflow-y: auto; /* السماح بالتمرير العمودي */
-                display: flex;
-                justify-content: center;
-                padding: 15px 5px;
-                -webkit-overflow-scrolling: touch; /* تمرير ناعم جداً على الآيفون والتابلت */
-            }
+        /* حاوية الشاشة الرئيسية */
+        #screen-table {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 0 20px;
+        }
 
-            /* 3. تعديل الشبكة لتناسب منطقة التمرير */
-            .table-grid {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr); /* 3 أعمدة */
-                gap: 15px;
-                width: 100%;
-                max-width: 500px;
-                height: max-content; /* تجعل الشبكة تتمدد حسب عدد الطاولات */
-            }
+        /* العنوان */
+        .header { 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: var(--card);
+            border-bottom: 2px solid var(--primary);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .header h1 { margin: 0; font-size: 2.2rem; font-weight: 900; color: var(--primary); }
+        #clock { font-size: 1.5rem; font-weight: 500; color: var(--text-sub); }
 
-            /* 4. تجميل شكل السكرول (اختياري) */
-            .tables-scroll-area::-webkit-scrollbar {
-                width: 4px;
-            }
-            .tables-scroll-area::-webkit-scrollbar-thumb {
-                background: rgba(255,255,255,0.2);
-                border-radius: 10px;
-            }
-            
-            .ticket { background: var(--card); padding: 20px; border-radius: 8px; border-top: 5px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-            .ticket.new { border-color: var(--primary); } .ticket.cooking { border-color: var(--warning); } .ticket.ready { border-color: var(--success); }
-            
-            .ticket-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; color: var(--primary); }
-            .btn { flex: 1; padding: 12px; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px; }
-            
-            #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; }
-            #lock-screen.active { display: flex; }
+        /* منطقة التمرير */
+        .tables-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px 10px;
+            scrollbar-width: thin;
+        }
 
-            @keyframes blink {
-                0% { opacity: 1; }
-                50% { opacity: 0.5; }
-                100% { opacity: 1; }
-            }
-        </style>
-    </head>
-    <body>
+        /* شبكة الطلبات - تعديل هنا للكمبيوتر */
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); /* تكبير الحجم الأدنى للكرت */
+            gap: 25px;
+            width: 100%;
+            margin: 0 auto;
+        }
 
-        <div id="screen-table">
-            <div id="lock-screen">
-                <i class="fas fa-lock" style="font-size:50px; color:var(--danger); margin-bottom:20px;"></i>
-                <h2>النظام مغلق مؤقتاً</h2>
-            </div>
+        /* تصميم التذكرة (Ticket) */
+        .ticket { 
+            background: var(--card); 
+            border-radius: 15px; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #333;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+        .ticket:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
 
-            <div class="header">
-                <h1 style="color:var(--primary)">المطبخ</h1>
-                <p id="clock" style="opacity:0.6"></p>
-            </div>
+        /* ألوان حالات الطلب */
+        .ticket.new { border-top: 10px solid var(--primary); }
+        .ticket.cooking { border-top: 10px solid var(--warning); }
+        .ticket.ready { border-top: 10px solid var(--success); }
 
-            <div class="tables-scroll-area">
-                <div class="table-grid" id="orders-container"></div>
-            </div>
+        /* رأس التذكرة */
+        .ticket-header { 
+            background: rgba(255,255,255,0.05);
+            padding: 15px 20px;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        .table-num { font-size: 1.8rem; font-weight: 900; color: #fff; }
+        .order-id { font-size: 1rem; color: var(--text-sub); background: #000; padding: 4px 10px; border-radius: 5px; }
+
+        /* جسم التذكرة */
+        .ticket-body { padding: 20px; flex: 1; }
+        .item-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 12px 0; 
+            border-bottom: 1px solid #333; 
+        }
+        .item-name { font-size: 1.4rem; font-weight: 700; color: #fff; }
+        .item-qty { font-size: 1.6rem; font-weight: 900; color: var(--warning); background: rgba(245, 127, 23, 0.1); padding: 2px 12px; border-radius: 8px; }
+
+        /* الفوتر (الوقت والربح) */
+        .ticket-footer { 
+            padding: 15px 20px; 
+            background: rgba(0,0,0,0.2);
+            border-top: 1px dashed #444;
+        }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .timer { font-weight: bold; font-size: 1.2rem; }
+        
+        /* الأزرار */
+        .actions { padding: 15px; display: flex; gap: 10px; }
+        .btn { 
+            flex: 1; 
+            padding: 15px; 
+            border: none; 
+            color: white; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.2s;
+        }
+        .btn:active { transform: scale(0.95); }
+
+        /* شاشة القفل */
+        #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        #lock-screen.active { display: flex; }
+
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .delayed { color: #ff4444 !important; animation: blink 1s infinite; }
+
+        /* التجاوب مع الموبايل */
+        @media (max-width: 600px) {
+            .table-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="screen-table">
+        <div id="lock-screen">
+            <i class="fas fa-lock" style="font-size:80px; color:var(--primary); margin-bottom:20px;"></i>
+            <h1 style="font-size: 3rem;">النظام مغلق</h1>
         </div>
 
-        <script>
-            // 1. منع القائمة اليمنى (Right Click)
-            document.addEventListener('contextmenu', event => event.preventDefault());
+        <div class="header">
+            <div>
+                <h1>مطبخ شيخ البلد</h1>
+                <small style="color:var(--text-sub)">نظام إدارة الطلبات المباشر</small>
+            </div>
+            <div id="clock">00:00:00</div>
+        </div>
 
-            // 2. منع اختصارات لوحة التحكم (F12, Ctrl+Shift+I, Ctrl+U)
-            document.onkeydown = function(e) {
-                // منع F12
-                if (e.keyCode == 123) return false;
+        <div class="tables-scroll-area">
+            <div class="table-grid" id="orders-container">
+                <!-- الطلبات ستظهر هنا -->
+            </div>
+        </div>
+    </div>
 
-                // منع Ctrl+Shift+I (Inspect)
-                if (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-                // منع Ctrl+Shift+J (Console)
-                if (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1J7lSkqHHShPlkvtIUwpgmgsGqJ1uhJQ",
+            authDomain: "sheikh-pro-61502.firebaseapp.com",
+            projectId: "sheikh-pro-61502",
+            storageBucket: "sheikh-pro-61502.firebasestorage.app",
+            messagingSenderId: "388665698743",
+            appId: "1:388665698743:web:7eca2bfc0223f9c1736032"
+        };
 
-                // منع Ctrl+U (View Source)
-                if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
-                // منع Ctrl+S (Save Page)
-                if (e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false;
-            };
+        // الساعة
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('ar-EG');
+        }, 1000);
 
-            // 3. تعطيل خاصية السحب والإفلات للصور (لحماية صور المنيو)
-            document.addEventListener('dragstart', event => event.preventDefault());
+        // الاستماع لحالة القفل
+        onValue(ref(db, 'config'), (snap) => {
+            const conf = snap.val();
+            if(conf && conf.locked) document.getElementById('lock-screen').classList.add('active');
+            else document.getElementById('lock-screen').classList.remove('active');
+        });
 
-            // تحذير في الكونسول
-            setInterval(() => {
-                console.clear();
-                console.log("%cتحذير!", "color: red; font-size: 50px; font-weight: bold;");
-                console.log("%cهذه المنطقة مخصصة للمطورين فقط. محاولة الدخول غير المصرح به تعرضك للمساءلة القانونية.", "font-size: 20px;");
-            }, 1000);
-        </script>
+        // الاستماع للطلبات
+        onValue(ref(db, 'orders'), (snap) => {
+            const data = snap.val();
+            const container = document.getElementById('orders-container');
+            
+            if (!data) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:100px; opacity:0.3; font-size:2rem;">لا توجد طلبات نشطة حالياً</div>';
+                return;
+            }
 
-        <script type="module">
-            import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-            import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+            const activeOrders = Object.entries(data)
+                .map(([key, value]) => ({ ...value, key }))
+                .filter(o => o.status !== 'paid' && o.status !== 'served')
+                .sort((a, b) => b.id - a.id);
 
-            const firebaseConfig = {
-                apiKey: "AIzaSyB1J7lSkqHHShPlkvtIUwpgmgsGqJ1uhJQ",
-                authDomain: "sheikh-pro-61502.firebaseapp.com",
-                projectId: "sheikh-pro-61502",
-                storageBucket: "sheikh-pro-61502.firebasestorage.app",
-                messagingSenderId: "388665698743",
-                appId: "1:388665698743:web:7eca2bfc0223f9c1736032",
-                measurementId: "G-5F3J5S68LP"
-            };
+            renderOrders(activeOrders);
+        });
 
-            const app = initializeApp(firebaseConfig);
-            const db = getDatabase(app);
+        function renderOrders(orders) {
+            const container = document.getElementById('orders-container');
+            
+            container.innerHTML = orders.map(o => {
+                const items = o.items || [];
+                const orderIdDisplay = o.id ? o.id.toString().slice(-4) : "0000";
+                
+                // حساب الربح
+                const profit = items.reduce((sum, i) => sum + (((parseFloat(i.price)||0) - (parseFloat(i.cost)||0)) * (parseInt(i.qty)||0)), 0);
 
-            // Lock Listener
-            onValue(ref(db, 'config'), (snap) => {
-                const conf = snap.val();
-                if(conf && conf.locked) $('lock-screen').classList.add('active');
-                else $('lock-screen').classList.remove('active');
-            });
+                let statusHTML = '';
+                let statusClass = '';
 
-            // استماع للطلبات
-            onValue(ref(db, 'orders'), (snap) => {
-                const data = snap.val();
-                if (!data) {
-                    document.getElementById('orders-container').innerHTML = '<h2 style="text-align:center;width:100%;opacity:0.5;">لا توجد طلبات حالياً</h2>';
-                    return;
+                if (o.status === 'pending') {
+                    statusClass = 'new';
+                    statusHTML = `<button class="btn" style="background:var(--primary)" onclick="updateStatus('${o.key}', 'cooking')">إستلام الطلب <i class="fas fa-fire"></i></button>`;
+                } else if (o.status === 'cooking') {
+                    statusClass = 'cooking';
+                    statusHTML = `<button class="btn" style="background:var(--warning); color:#000" onclick="updateStatus('${o.key}', 'ready')">جهز الآن <i class="fas fa-check-circle"></i></button>`;
+                } else if (o.status === 'ready') {
+                    statusClass = 'ready';
+                    statusHTML = `<button class="btn" style="background:var(--success)" onclick="updateStatus('${o.key}', 'served')">تم التوصيل <i class="fas fa-user-check"></i></button>`;
                 }
 
-                // تحويل الكائن لمصفوفة وفلترة الطلبات اللي لسه مخلصتش
-                const activeOrders = Object.entries(data)
-                    .map(([key, value]) => ({ ...value, key }))
-                    .filter(o => o.status !== 'paid' && o.status !== 'served')
-                    .sort((a, b) => b.id - a.id); // الأحدث فوق
+                return `
+                <div class="ticket ${statusClass}">
+                    <div class="ticket-header">
+                        <span class="table-num"><i class="fas fa-utensils"></i> طاولة ${o.tableId || '?'}</span>
+                        <span class="order-id">#${orderIdDisplay}</span>
+                    </div>
 
-                renderOrders(activeOrders);
-            });
-
-            function renderOrders(orders) {
-                const container = $('orders-container');
-
-                if (orders.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; padding:50px; opacity:0.5; color:white;">لا توجد طلبات نشطة حالياً</div>';
-                    return;
-                }
-
-                container.innerHTML = orders.map(o => {
-                    // 1. التأكد من وجود الأصناف (أمان)
-                    const items = o.items || [];
-
-                    // 2. معالجة رقم الطلب بأمان (إصلاح خطأ toString)
-                    const orderIdDisplay = o.id ? o.id.toString().slice(-4) : "0000";
-
-                    // 3. حساب الربح بأمان (إصلاح خطأ reduce)
-                    const orderProfit = items.reduce((sum, item) => {
-                        const price = parseFloat(item.price) || 0;
-                        const cost = parseFloat(item.cost) || 0;
-                        const qty = parseInt(item.qty) || 0;
-                        return sum + ((price - cost) * qty);
-                    }, 0);
-
-                    let statusText = '';
-                    let statusClass = '';
-                    let actionBtn = '';
-
-                    if (o.status === 'pending') {
-                        statusText = 'جديد';
-                        statusClass = 'new';
-                        actionBtn = `<button class="btn" style="background:var(--primary)" onclick="updateOrder('${o.key}', 'cooking')">بدء التحضير <i class="fas fa-fire"></i></button>`;
-                    } else if (o.status === 'cooking') {
-                        statusText = 'جاري التحضير';
-                        statusClass = 'cooking';
-                        actionBtn = `<button class="btn" style="background:var(--warning)" onclick="updateOrder('${o.key}', 'ready')">تم التحضير <i class="fas fa-check-circle"></i></button>`;
-                    } else if (o.status === 'ready') {
-                        statusText = 'جاهز للتقديم';
-                        statusClass = 'ready';
-                        actionBtn = `<button class="btn" style="background:var(--success)" onclick="updateOrder('${o.key}', 'served')">تم التوصيل <i class="fas fa-user-check"></i></button>`;
-                    }
-
-                    return `
-                    <div class="ticket ${statusClass}" id="ticket-${o.key}">
-                        <div class="ticket-header">
-                            <span><i class="fas fa-chair"></i> طاولة ${o.tableId || '?'}</span>
-                            <span>طلب #${orderIdDisplay}</span>
-                        </div>
-                        <div style="font-size:12px; color:#aaa; margin-bottom:15px; display:flex; justify-content:space-between;">
-                        <div style="display:flex; flex-direction:column; gap:2px;">
-                            <span>${o.time || '--:--'}</span>
-                            <span class="live-timer" data-start="${o.timestamp || o.id}" style="color:var(--warning); font-weight:bold; font-size:14px;">
-                                جاري الحساب...
-                            </span>
-                        </div>
-                            <span style="font-weight:bold;">${statusText}</span>
-                        </div>
-
-                        <div style="min-height:50px;">
-                            ${items.map(i => `
-                                <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #333;">
-                                    <span>${i.name || 'صنف مجهول'}</span>
-                                    <span style="font-weight:bold; color:var(--warning)">x${i.qty || 1}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px dashed #444;">
-                            <div>المجموع: <span style="font-size:18px; font-weight:bold;">${o.total || 0}</span> ج.م</div>
-
-                            <div style="text-align:left;">
-                                <small style="color:#aaa;">الربح</small>
-                                <div style="font-size:16px; font-weight:bold; color:var(--success);">${orderProfit.toFixed(2)} ج.م</div>
+                    <div class="ticket-body">
+                        ${items.map(i => `
+                            <div class="item-row">
+                                <span class="item-name">${i.name}</span>
+                                <span class="item-qty">x${i.qty}</span>
                             </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="ticket-footer">
+                        <div class="info-row">
+                            <span class="timer live-timer" data-start="${o.timestamp || o.id}">
+                                <i class="fas fa-clock"></i> 00:00
+                            </span>
+                            <span style="font-weight:bold; color:var(--text-sub)">${o.time || ''}</span>
                         </div>
+                        <div class="info-row" style="margin-top:10px; font-size:1.1rem;">
+                            <span>الإجمالي: ${o.total} ج.م</span>
+                            <span style="color:var(--success)">الربح: ${profit.toFixed(2)}</span>
+                        </div>
+                    </div>
 
-                        <div class="actions" style="display:flex; gap:10px; margin-top:15px;">${actionBtn}</div>
-                    </div>`;
-                }).join('');
-            }
+                    <div class="actions">
+                        ${statusHTML}
+                    </div>
+                </div>
+                `;
+            }).join('');
+            
+            updateTimers();
+        }
 
-            window.updateOrder = (orderKey, newStatus) => {
-                const orderRef = ref(db, `orders/${orderKey}`);
-                update(orderRef, { status: newStatus })
-                .then(() => {
-                    console.log("تم تحديث الحالة");
-                })
-                .catch((err) => alert("عفواً حدث خطأ"));
-            };
+        window.updateStatus = (key, status) => {
+            update(ref(db, `orders/${key}`), { status: status });
+        };
 
-            async function createNewOrder() {
-                if (cart.length === 0) return alert('السلة فارغة!');
+        function updateTimers() {
+            const now = Date.now();
+            document.querySelectorAll('.live-timer').forEach(el => {
+                const start = parseInt(el.getAttribute('data-start'));
+                const diff = Math.floor((now - start) / 1000);
+                const m = Math.floor(diff / 60);
+                const s = diff % 60;
+                el.innerHTML = `<i class="fas fa-clock"></i> منذ ${m}:${s < 10 ? '0' : ''}${s}`;
+                
+                if (m >= 15) el.classList.add('delayed');
+            });
+        }
+        setInterval(updateTimers, 1000);
 
-                const total = cart.reduce((s, i) => s + (i.price * i.qty), 0);
-
-                // تجهيز الطلب بالشكل اللي المطبخ بيفهمه
-                const orderData = {
-                    id: Date.now(),
-                    tableId: selectedTable,
-                    items: cart.map(item => ({
-                        id: item.id,
-                        name: item.name,
-                        price: item.price,
-                        cost: item.cost || 0, // مهم جداً عشان المطبخ يحسب الربح
-                        qty: item.qty
-                    })),
-                    status: 'pending', // الحالة اللي بتخلي الأوردر يظهر في المطبخ
-                    time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-                    date: new Date().toLocaleDateString('ar-EG'),
-                    total: total,
-                    user: 'زبون'
-                };
-
-                try {
-                    // إرسال للمطبخ
-                    await push(ref(db, 'orders'), orderData);
-                    // تحديث حالة الطاولة في لوحة التحكم
-                    await update(ref(db, `tables/${selectedTable}`), { occupied: true });
-
-                    showToast('✅ تم إرسال طلبك للمطبخ');
-                    window.closeCart();
-                } catch (e) {
-                    alert('خطأ في الاتصال: ' + e.message);
-                }
-            }
-
-            const $ = id => document.getElementById(id);
-            setInterval(() => $('clock').innerText = new Date().toLocaleTimeString('ar-EG'), 1000);
-
-            // وظيفة لحساب الوقت المنقضي
-            function updateTimers() {
-                const now = Date.now();
-                document.querySelectorAll('.live-timer').forEach(el => {
-                    const startTime = parseInt(el.getAttribute('data-start'));
-                    const diffInSeconds = Math.floor((now - startTime) / 1000);
-                    
-                    const minutes = Math.floor(diffInSeconds / 60);
-                    const seconds = diffInSeconds % 60;
-
-                    // تنسيق الوقت ليظهر بشكل احترافي (مثال 05:09)
-                    const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                    
-                    el.innerHTML = `<i class="fas fa-clock"></i> منذ: ${formattedTime}`;
-
-                    // تغيير اللون للأحمر إذا تأخر الطلب أكثر من 15 دقيقة
-                    if (minutes >= 15) {
-                        el.style.color = "#ff4444";
-                        el.style.animation = "blink 1s infinite"; // إضافة وميض للطلبات المتأخرة
-                    }
-                });
-            }
-
-            // تشغيل التحديث كل ثانية واحدة
-            setInterval(updateTimers, 1000);
-        </script>
-    </body>
-    </html>
+        // حماية الصفحة
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>
