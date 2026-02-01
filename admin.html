@@ -320,8 +320,12 @@
 
                 <!-- POS Tab -->
                 <div id="tab-pos">
-                    <div class="card" style="padding: 10px;">
+                    <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;">
                         <select id="pos-table" class="input" style="margin:0;"></select>
+                        <!-- هذا هو السطر الجديد للاختيار -->
+                        <select id="pos-waiter-select" class="input" style="margin:0;">
+                            <option value="">اختر الويتر...</option>
+                        </select>
                     </div>
                     <div id="pos-menu-list" class="grid-pos"></div>
                 </div>
@@ -406,30 +410,27 @@
                     </div>
                 </div>
 
-                <!-- Users Tab -->
-                <div id="tab-users" style="display:none; padding: 10px;">
-                    <div class="card" style="background: #fff; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                        <h2 style="color: var(--primary); margin-bottom: 20px; text-align: center;">إدارة طاقم العمل</h2>
-
-                        <!-- خانات الإضافة -->
-                        <div style="background: #f9fafb; padding: 15px; border-radius: 12px; margin-bottom: 25px;">
-                            <input type="text" id="new-username" class="input" placeholder="اسم المستخدم (مثلاً: محمود)">
-                            <input type="password" id="new-password" class="input" placeholder="كلمة المرور">
-                            <select id="new-user-role" class="input">
-                                <option value="admin">مدير (صلاحيات كاملة بدون حذف سجلات)</option>
-                                <option value="manager">موظف كاشير (بيع فقط)</option>
-                            </select>
-                            <button class="btn btn-success" style="width:100%; margin-top:10px; height: 50px;" onclick="addUser()">
-                                <i class="fas fa-plus-circle"></i> إضافة المستخدم الآن
-                            </button>
+                <!-- تبويب إدارة الموظفين - يظهر للمدير فقط -->
+                <div id="tab-users" style="display:none;">
+                    <div class="card" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <h3 style="margin-bottom: 15px; color: #b71c1c;">إضافة موظف جديد (ويتر / مدير)</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <input type="text" id="new-u-name" class="input" placeholder="اسم المستخدم (مثل: احمد)">
+                            <input type="password" id="new-u-pass" class="input" placeholder="كلمة المرور">
                         </div>
+                        <select id="new-u-role" class="input" style="margin-top: 10px;">
+                            <option value="waiter">ويتر (صلاحية البيع فقط)</option>
+                            <option value="admin">مدير (صلاحية كاملة)</option>
+                        </select>
+                        <button class="btn btn-success" style="width: 100%; margin-top: 15px; height: 45px;" onclick="saveNewUser()">
+                            <i class="fas fa-user-plus"></i> حفظ الموظف في النظام
+                        </button>
+                    </div>
 
-                        <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 20px;">
-
-                        <!-- العنوان والمكان الذي ستظهر فيه الأسماء -->
-                        <h3 style="margin-bottom:15px; font-size: 18px; color: #374151;">المستخدمين الحاليين:</h3>
-                        <div id="users-list-container" style="min-height: 50px; background: #fff;">
-                            <!-- الأسماء ستظهر هنا إجبارياً -->
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>طاقم العمل الحالي</h3>
+                        <div id="users-display-list">
+                            <!-- هنا ستظهر أسماء الموظفين المسجلين -->
                         </div>
                     </div>
                 </div>
@@ -661,8 +662,15 @@
 
                 onValue(ref(db, 'users'), (snapshot) => {
                     allUsers = snapshot.val() || [];
-                    console.log("البيانات وصلت من السيرفر:", allUsers);
-                    renderUsersList(); // استدعاء دالة الرسم فور وصول البيانات
+                    renderUsersList();
+
+                    // تحديث قائمة الموظفين في شاشة البيع (POS)
+                    const waiterSelect = $('pos-waiter-select');
+                    if (waiterSelect) {
+                        const usersArray = Array.isArray(allUsers) ? allUsers : Object.values(allUsers);
+                        waiterSelect.innerHTML = '<option value="">اختر الويتر...</option>' +
+                            usersArray.map(u => `<option value="${u.username}">${u.username}</option>`).join('');
+                    }
                 });
             }
 
@@ -825,16 +833,19 @@
                 if(cart.length === 0) return;
 
                 const selectedTable = $('pos-table').value;
+                const selectedWaiter = $('pos-waiter-select').value; // الاسم المختار من القائمة
+
+                if(!selectedWaiter) return alert("يرجى اختيار اسم الويتر أولاً");
+
                 const totalAmount = cart.reduce((s,i)=>s+(i.price*i.qty),0);
 
                 const orderData = {
                     tableId: selectedTable,
                     items: cart,
                     status: 'pending',
-                    // التأكد من تسجيل الوقت والتاريخ واسم المستخدم
                     time: new Date().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'}),
                     date: new Date().toLocaleDateString('ar-EG'),
-                    user: currentUser ? currentUser.username : "غير معروف",
+                    user: selectedWaiter, // هنا نضع اسم الويتر المختار بدلاً من اسم الأدمن
                     total: totalAmount,
                     timestamp: Date.now()
                 };
@@ -1289,9 +1300,44 @@
                 }
             };
 
+            // وظيفة حفظ موظف جديد
+            window.saveNewUser = async () => {
+                const name = document.getElementById('new-u-name').value.trim();
+                const pass = document.getElementById('new-u-pass').value.trim();
+                const role = document.getElementById('new-u-role').value;
+
+                if (!name || !pass) return alert("يرجى كتابة الاسم وكلمة السر!");
+
+                try {
+                    // جلب قائمة المستخدمين الحالية من Firebase
+                    const snap = await get(ref(db, 'users'));
+                    let usersList = [];
+                    if (snap.exists()) {
+                        usersList = Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+                    }
+
+                    // إضافة المستخدم الجديد للمصفوفة
+                    usersList.push({
+                        username: name,
+                        password: pass,
+                        role: role
+                    });
+
+                    // رفع القائمة المحدثة للسيرفر
+                    await set(ref(db, 'users'), usersList);
+
+                    alert("✅ تم تسجيل الموظف: " + name);
+                    // مسح الخانات بعد الحفظ
+                    document.getElementById('new-u-name').value = '';
+                    document.getElementById('new-u-pass').value = '';
+                } catch (e) {
+                    alert("خطأ في الاتصال: " + e.message);
+                }
+            };
+
             function renderUsersList() {
                 // 1. الوصول للمكان الجديد
-                const listContainer = document.getElementById('users-list-container');
+                const listContainer = document.getElementById('users-display-list');
 
                 // تأكد من أن العنصر موجود فعلاً
                 if (!listContainer) {
