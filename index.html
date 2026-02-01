@@ -138,6 +138,26 @@
 </head>
 <body>
 
+    <!-- شاشة تسجيل الدخول الإجبارية -->
+    <div id="auth-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #b71c1c; z-index: 10000; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white; font-family: 'Tajawal', sans-serif;">
+        <img src="logo.png" style="width: 100px; margin-bottom: 20px;"> <!-- ضع رابط لوجو المطعم هنا -->
+        <h2 style="margin-bottom: 30px;">نظام طلبات شيخ البلد</h2>
+
+        <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+
+            <!-- تم تغيير خانة الاسم إلى قائمة اختيار -->
+            <select id="login-user-list" style="padding: 12px; border: 2px solid #ddd; border-radius: 8px; outline: none; color: #333; text-align: center; font-size: 16px; font-family: 'Tajawal';">
+                <option value="">اختر اسم الويتر...</option>
+            </select>
+
+            <input type="password" id="login-pass" placeholder="كلمة المرور" style="padding: 12px; border: 2px solid #ddd; border-radius: 8px; outline: none; color: #333; text-align: center;">
+
+            <button onclick="checkAuth()" style="padding: 12px; background: #b71c1c; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px;">دخول النظام</button>
+
+            <p id="error-msg" style="color: red; font-size: 13px; text-align: center; display: none;">خطأ في البيانات!</p>
+        </div>
+    </div>
+
     <!-- Maintenance Lock Screen -->
     <div id="maintenance-screen">
         <i class="fas fa-lock lock-icon"></i>
@@ -186,6 +206,16 @@
             </div>
             <div style="width: 40px;"></div> <!-- Spacer -->
         </header>
+
+        <!-- احذف هذا الجزء لأنه ملوش لازمة دلوقتى -->
+        <!--
+        <div style="padding: 15px 20px; background: white; border-bottom: 1px solid #f3f4f6;">
+            <label>الموظف المسؤول:</label>
+            <select id="waiter-select" class="input">
+                <option value="">اختر الويتر...</option>
+            </select>
+        </div>
+        -->
 
         <div class="categories" id="categories-container">
             <div class="cat-chip active" onclick="filterMenu('all')">الكل</div>
@@ -276,6 +306,25 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
+        // كود جلب أسماء الموظفين ووضعها في قائمة الاختيار
+        onValue(ref(db, 'users'), (snapshot) => {
+            const userListSelect = document.getElementById('login-user-list');
+            if (snapshot.exists()) {
+                const users = snapshot.val();
+                const usersArray = Array.isArray(users) ? users : Object.values(users);
+
+                // تفريغ القائمة وإعادة ملئها
+                userListSelect.innerHTML = '<option value="">اختر اسم الويتر...</option>';
+                usersArray.forEach(user => {
+                    // إضافة الموظفين فقط (ممكن تستثني الـ super-admin لو حابب)
+                    let option = document.createElement('option');
+                    option.value = user.username;
+                    option.textContent = user.username;
+                    userListSelect.appendChild(option);
+                });
+            }
+        });
+
         // --- State Variables ---
         let cart = [];
         let selectedTable = null;
@@ -289,6 +338,73 @@
         const $ = id => document.getElementById(id);
 
         let allTables = {}; // Global variable to store tables data
+
+        // --- Auth Overlay ---
+        // دالة التحقق من تسجيل الدخول عند تحميل الصفحة
+        document.addEventListener("DOMContentLoaded", function() {
+            // إذا لم يجد حالة دخول، يظهر شاشة القفل فوراً
+            if (sessionStorage.getItem('isLoggedIn') !== 'true') {
+                document.getElementById('auth-overlay').style.display = 'flex';
+            } else {
+                document.getElementById('auth-overlay').style.display = 'none';
+                loadWaitersToSelect(); // تحميل الموظفين في الاختيارات
+            }
+        });
+
+        window.checkAuth = async () => {
+            const userVal = document.getElementById('login-user-list').value; // القيمة من القائمة
+            const passVal = document.getElementById('login-pass').value.trim();
+            const errorMsg = document.getElementById('error-msg');
+
+            if(!userVal) return alert("يرجى اختيار اسم الويتر");
+            if(!passVal) return alert("يرجى كتابة كلمة المرور");
+
+            try {
+                const snap = await get(ref(db, 'users'));
+                if (snap.exists()) {
+                    const usersArray = Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+                    const foundUser = usersArray.find(u => u.username === userVal && u.password === passVal);
+
+                    if (foundUser) {
+                        sessionStorage.setItem('isLoggedIn', 'true');
+                        sessionStorage.setItem('currentWaiter', foundUser.username);
+                        document.getElementById('auth-overlay').style.display = 'none';
+                    } else {
+                        errorMsg.style.display = 'block';
+                        errorMsg.innerText = "❌ كلمة المرور غير صحيحة";
+                    }
+                }
+            } catch (e) {
+                alert("خطأ في الاتصال: " + e.message);
+            }
+        };
+
+        // --- Load Waiters to Select ---
+        async function loadWaitersToSelect() {
+            const waiterSelect = document.getElementById('waiter-select');
+            if(!waiterSelect) return;
+
+            try {
+                const snap = await get(ref(db, 'users'));
+                if (snap.exists()) {
+                    const users = Object.values(snap.val());
+                    // نملأ القائمة بأسماء الموظفين فقط
+                    waiterSelect.innerHTML = users.map(u =>
+                        `<option value="${u.username}">${u.username}</option>`
+                    ).join('');
+
+                    // اختيار الموظف اللي لسه مسجل دخول حالياً تلقائياً
+                    waiterSelect.value = sessionStorage.getItem('currentWaiter') || "";
+                }
+            } catch (e) {
+                console.error("خطأ في تحميل الموظفين:", e);
+            }
+        }
+
+        // استدعاء الدالة عند تحميل الصفحة إذا كان مسجل دخول
+        if(sessionStorage.getItem('isLoggedIn') === 'true') {
+            loadWaitersToSelect();
+        }
 
         // --- Listeners ---
         onValue(ref(db, 'config'), (snap) => {
@@ -643,21 +759,39 @@
 
         // Create New Order (Customer)
         async function createNewOrder() {
-            const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
-            const newOrderRef = await push(ref(db, 'orders'), {
-                id: Date.now(), 
-                tableId: selectedTable, 
-                items: cart, 
-                status: 'pending', 
-                time: new Date().toLocaleTimeString('ar-EG'), 
-                total, 
-                type: 'client'
-            });
+            if (cart.length === 0) return;
 
-            // Lock Table
-            await update(ref(db, `tables/${selectedTable}`), { occupied: true });
-            
-            currentOrderKey = newOrderRef.key; // Save key just in case
+            const total = cart.reduce((s, i) => s + (i.price * i.qty), 0);
+
+            // سحب اسم الويتر اللي سجل دخول في البداية
+            const waiterName = sessionStorage.getItem('currentWaiter') || "ويتر غير معروف";
+
+            const orderData = {
+                tableId: selectedTable,
+                items: cart,
+                status: 'pending',
+                // تسجيل اسم الموظف هنا
+                user: waiterName,
+                time: new Date().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'}),
+                date: new Date().toLocaleDateString('ar-EG'),
+                total: total,
+                timestamp: Date.now()
+            };
+
+            try {
+                const newOrderRef = await push(ref(db, 'orders'), orderData);
+                // تحديث حالة الطاولة وتوقيت البداية للتايمر
+                await update(ref(db, `tables/${selectedTable}`), {
+                    occupied: true,
+                    lastOrderTime: Date.now()
+                });
+
+                currentOrderKey = newOrderRef.key;
+                showToast('✅ تم إرسال طلب ' + waiterName + ' للمطبخ');
+                window.closeCart();
+            } catch (e) {
+                alert("فشل إرسال الطلب: " + e.message);
+            }
         }
 
         // Update Existing Order (Staff)
