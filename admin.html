@@ -390,9 +390,34 @@
 
                 <!-- Reports Tab -->
                 <div id="tab-reports" style="display:none;">
+                    <!-- فلتر التاريخ -->
+                    <div class="card" style="background: #fff; border-bottom: 4px solid var(--primary);">
+                        <h3 style="margin-bottom: 15px;"><i class="fas fa-calendar-alt"></i> فلتر التقارير بالوقت</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                            <div>
+                                <label style="font-size: 12px; font-weight: bold;">من تاريخ:</label>
+                                <input type="date" id="report-start-date" class="input" style="margin:0;">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; font-weight: bold;">إلى تاريخ:</label>
+                                <input type="date" id="report-end-date" class="input" style="margin:0;">
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-primary" onclick="renderReports()" style="height: 45px; padding: 0 25px;">
+                                    <i class="fas fa-search"></i> عرض
+                                </button>
+                                <button class="btn btn-ghost" onclick="resetReportFilter()" style="height: 45px; background: #eee;">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- تبويب التقارير المعدل -->
+                    <!-- الكروت الثلاثة الأساسية (موجودة عندك) -->
                     <div class="grid-3" style="margin-bottom:20px;">
                         <div class="stat-card" style="border-top: 4px solid var(--success);">
-                            <small style="color:var(--text-light)">المبيعات</small>
+                            <small style="color:var(--text-light)">إجمالي المبيعات</small>
                             <span class="stat-val" id="report-sales" style="color:var(--success)">0</span> <small>ج.م</small>
                         </div>
                         <div class="stat-card" style="border-top: 4px solid var(--danger);">
@@ -404,8 +429,17 @@
                             <span class="stat-val" id="report-profit" style="color:var(--primary)">0</span> <small>ج.م</small>
                         </div>
                     </div>
+
+                    <!-- الجزء الجديد: تقرير أداء الموظفين -->
+                    <div class="card" style="border-right: 5px solid var(--warning); margin-bottom: 20px;">
+                        <h3 style="color: var(--text);"><i class="fas fa-user-chart"></i> تقرير إنتاجية الموظفين (الويترز)</h3>
+                        <div id="waiter-performance-list">
+                            <!-- سيتم ملؤه بالـ JS -->
+                        </div>
+                    </div>
+
                     <div class="card">
-                        <h3>سجل المبيعات</h3>
+                        <h3>سجل المبيعات الأخير</h3>
                         <div id="report-list" style="max-height:400px; overflow-y:auto;"></div>
                     </div>
                 </div>
@@ -833,9 +867,14 @@
                 if(cart.length === 0) return;
 
                 const selectedTable = $('pos-table').value;
-                const selectedWaiter = $('pos-waiter-select').value; // الاسم المختار من القائمة
+                const waiterName = $('pos-waiter-select').value; // القائمة اللي ضفناها
 
-                if(!selectedWaiter) return alert("يرجى اختيار اسم الويتر أولاً");
+                // سطر الحماية:
+                if(!waiterName || waiterName === "") {
+                    alert("⚠️ خطأ: يجب اختيار اسم الويتر قبل إرسال الطلب!");
+                    $('pos-waiter-select').style.borderColor = "red";
+                    return;
+                }
 
                 const totalAmount = cart.reduce((s,i)=>s+(i.price*i.qty),0);
 
@@ -843,9 +882,9 @@
                     tableId: selectedTable,
                     items: cart,
                     status: 'pending',
+                    user: waiterName, // تسجيل الاسم هنا
                     time: new Date().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'}),
                     date: new Date().toLocaleDateString('ar-EG'),
-                    user: selectedWaiter, // هنا نضع اسم الويتر المختار بدلاً من اسم الأدمن
                     total: totalAmount,
                     timestamp: Date.now()
                 };
@@ -1061,55 +1100,125 @@
                 } catch (e) { alert("خطأ: " + e.message); }
             };
 
-            function renderReports() {
-                // جلب كل الطلبات وتحويلها لمصفوفة مع مفاتيحها
-                const ordersEntries = Object.entries(allOrders);
-                const paidOrders = ordersEntries.filter(([key, o]) => o.status === 'paid');
+            // دالة لمسح الفلتر والعودة لعرض كل شيء
+            window.resetReportFilter = () => {
+                $('report-start-date').value = '';
+                $('report-end-date').value = '';
+                renderReports();
+            };
 
-                let totalSales = 0;
-                let totalCost = 0;
+// 1. ربط الدالة بـ window عشان الزرار يشوفها
+window.renderReports = () => {
+    console.log("تم الضغط على زر العرض"); // لو فتحت الكونسول هتلاقي الكلمة دي ظهرت
 
-                paidOrders.forEach(([key, order]) => {
-                    totalSales += parseFloat(order.total) || 0;
-                    if(order.items) {
-                        order.items.forEach(item => {
-                            const product = menuData.find(p => p.id == item.id);
-                            if(product) totalCost += (parseFloat(product.cost) || 0) * item.qty;
-                        });
-                    }
-                });
+    const startDateInput = document.getElementById('report-start-date');
+    const endDateInput = document.getElementById('report-end-date');
+    
+    if (!startDateInput || !endDateInput) return;
 
-                $('report-sales').innerText = totalSales.toFixed(1);
-                $('report-cost').innerText = totalCost.toFixed(1);
-                $('report-profit').innerText = (totalSales - totalCost).toFixed(1);
+    const startDateVal = startDateInput.value;
+    const endDateVal = endDateInput.value;
 
-                // رسم السجل مع زر الحذف
-                $('report-list').innerHTML = paidOrders.reverse().map(([key, o]) => `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:white; margin-bottom:8px; border-radius:12px; border:1px solid #eee; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <div style="background:var(--primary-light); color:var(--primary); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:bold;">
-                                ${o.tableId}
-                            </div>
-                            <div>
-                                <strong style="display:block;">طاولة ${o.tableId}</strong>
-                                <small style="color:#777;">
-                                    ${o.date || 'تاريخ قديم'} | ${o.time || ''}
-                                    ${o.user ? ' | بواسطة: ' + o.user : ''}
-                                </small>
-                            </div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:15px;">
-                            <strong style="color:var(--success); font-size:16px;">${o.total} ج.م</strong>
-                            <button class="delete-btn btn btn-ghost"
-                                    style="color:var(--danger); padding:5px; background:none;"
-                                    onclick="deleteOrderRecord('${key}')"
-                                    title="حذف السجل">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
+    // تحويل التواريخ لمقارنة دقيقة
+    const startTS = startDateVal ? new Date(startDateVal).setHours(0,0,0,0) : 0;
+    const endTS = endDateVal ? new Date(endDateVal).setHours(23,59,59,999) : Infinity;
+
+    // التأكد من وجود أوردرات
+    if (!allOrders) {
+        console.log("لا توجد بيانات أوردرات حالياً");
+        return;
+    }
+
+    const ordersEntries = Object.entries(allOrders);
+    
+    // فلترة الأوردرات المدفوعة وفي نطاق التاريخ
+    const filteredOrders = ordersEntries.filter(([key, o]) => {
+        const isPaid = o.status === 'paid';
+        let orderTS = o.timestamp;
+
+        // لو مفيش بصمة وقت، بنحاول نستنتجها من التاريخ المكتوب
+        if (!orderTS && o.date) {
+            const parts = o.date.split('/');
+            if(parts.length === 3) {
+                orderTS = new Date(`${parts[1]}/${parts[0]}/${parts[2]}`).getTime();
             }
+        }
+        return isPaid && (orderTS >= startTS && orderTS <= endTS);
+    });
+
+    // حساب الإحصائيات
+    let totalSales = 0;
+    let totalCost = 0;
+    let waiterStats = {};
+
+    filteredOrders.forEach(([key, order]) => {
+        const amount = parseFloat(order.total) || 0;
+        totalSales += amount;
+        
+        if(order.items) {
+            order.items.forEach(item => {
+                const product = menuData.find(p => p.id == item.id);
+                if(product) totalCost += (parseFloat(product.cost) || 0) * (item.qty || 0);
+            });
+        }
+
+        const waiterName = order.user || "غير محدد";
+        if (!waiterStats[waiterName]) waiterStats[waiterName] = { count: 0, total: 0 };
+        waiterStats[waiterName].count++;
+        waiterStats[waiterName].total += amount;
+    });
+
+    // تحديث الأرقام في الشاشة فوراً
+    document.getElementById('report-sales').innerText = totalSales.toFixed(1);
+    document.getElementById('report-cost').innerText = totalCost.toFixed(1);
+    document.getElementById('report-profit').innerText = (totalSales - totalCost).toFixed(1);
+
+    // رسم جدول الويترز
+    const waiterContainer = document.getElementById('waiter-performance-list');
+    if (filteredOrders.length === 0) {
+        waiterContainer.innerHTML = `<div style="text-align:center; padding:30px; color:#999;">لا توجد نتائج لهذه الفترة</div>`;
+        document.getElementById('report-list').innerHTML = "";
+        return;
+    }
+
+    let waiterHtml = `<table style="width:100%; text-align:right; border-collapse:collapse;">
+        <thead style="background:#f8f9fa; font-size:12px; color:#666;">
+            <tr>
+                <th style="padding:10px; border-bottom:2px solid #eee;">الويتر</th>
+                <th style="padding:10px; border-bottom:2px solid #eee;">عدد الأوردرات</th>
+                <th style="padding:10px; border-bottom:2px solid #eee;">إجمالي المبيعات</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    Object.entries(waiterStats).forEach(([name, stats]) => {
+        waiterHtml += `<tr style="border-bottom:1px solid #eee;">
+            <td style="padding:10px;"><i class="fas fa-user-circle"></i> ${name}</td>
+            <td style="padding:10px;">${stats.count}</td>
+            <td style="padding:10px; font-weight:bold; color:var(--success);">${stats.total.toFixed(1)} ج.م</td>
+        </tr>`;
+    });
+    waiterHtml += `</tbody></table>`;
+    waiterContainer.innerHTML = waiterHtml;
+
+    // رسم سجل المبيعات الأسفل
+    document.getElementById('report-list').innerHTML = filteredOrders.reverse().map(([key, o]) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:white; margin-bottom:8px; border-radius:12px; border:1px solid #eee;">
+            <div>
+                <strong>طاولة ${o.tableId}</strong>
+                <small style="display:block; color:#777;">${o.time} | الويتر: ${o.user}</small>
+            </div>
+            <strong style="color:var(--success);">${o.total} ج.م</strong>
+        </div>
+    `).join('');
+};
+
+// 2. كود زرار الريسيت (Reset)
+window.resetReportFilter = () => {
+    document.getElementById('report-start-date').value = '';
+    document.getElementById('report-end-date').value = '';
+    window.renderReports();
+};
 
             // --- Menu ---
             function renderMenuList() {
