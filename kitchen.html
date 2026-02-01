@@ -242,8 +242,16 @@
                 return `
                 <div class="ticket ${statusClass}">
                     <div class="ticket-header">
-                        <span class="table-num"><i class="fas fa-utensils"></i> طاولة ${o.tableId || '?'}</span>
-                        <span class="order-id">#${orderIdDisplay}</span>
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <span class="table-num"><i class="fas fa-utensils"></i> طاولة ${o.tableId || '?'}</span>
+                                <!-- السطر الجديد المضاف لظهور اسم الويتر -->
+                                <div style="font-size: 13px; color: #fbbf24; margin-top: 5px; font-weight: bold;">
+                                    <i class="fas fa-user-edit"></i> الويتر: ${o.user || 'غير معروف'}
+                                </div>
+                            </div>
+                            <span class="order-id">#${orderIdDisplay}</span>
+                        </div>
                     </div>
 
                     <div class="ticket-body">
