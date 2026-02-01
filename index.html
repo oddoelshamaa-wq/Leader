@@ -341,32 +341,53 @@
         // تحديث العداد كل 30 ثانية
         setInterval(updateTablesLiveTimers, 30000);
 
-        // --- Render Tables with Status Badges ---
+        // --- نسخة محسنة وآمنة لرسم الطاولات (حل مشكلة الشاشة الفارغة) ---
         onValue(ref(db, 'tables'), async s => {
-            const tables = s.val() || {};
-            allTables = tables; // Update global tables data
-            
-            // Fetch all pending orders to show item counts on tables
-            const ordersSnap = await get(ref(db, 'orders'));
-            const orders = ordersSnap.val() || {};
-            
-            // Helper to get count
-            const getItemCount = (tableId) => {
-                const order = Object.values(orders).find(o => o.tableId == tableId && o.status === 'pending');
-                if(!order) return 0;
-                return order.items.reduce((acc, item) => acc + item.qty, 0);
-            };
+            try {
+                const tables = s.val();
+                if (!tables) {
+                    document.getElementById('tables-container').innerHTML = "<p style='color:white; text-align:center; grid-column:1/-1;'>لا توجد طاولات مضافة حالياً</p>";
+                    return;
+                }
+                allTables = tables;
 
-            // Generate HTML for each table button
-            $('tables-container').innerHTML = Object.values(tables).map(t => {
-                const count = getItemCount(t.id);
-                const badge = count > 0 ? `<span class="badge-qty">${count}</span>` : '';
+                // جلب الطلبات بشكل آمن
+                let orders = {};
+                try {
+                    const ordersSnap = await get(ref(db, 'orders'));
+                    orders = ordersSnap.val() || {};
+                } catch (e) { console.error("خطأ في جلب الطلبات:", e); }
 
-                return generateTableButton(t, badge, tables);
-            }).join('');
+                // تحويل الطاولات لمصفوفة للرسم
+                const tablesList = Object.values(tables);
 
-            // استدعاء الوظيفة أيضاً فور تحميل البيانات لضمان ظهور الوقت فوراً
-            updateTablesLiveTimers();
+                document.getElementById('tables-container').innerHTML = tablesList.map(t => {
+                    // حساب عدد الأصناف بأمان شديد
+                    let count = 0;
+                    try {
+                        const allOrdersArray = Object.values(orders);
+                        const activeOrder = allOrdersArray.find(o => String(o.tableId) === String(t.id) && o.status === 'pending');
+                        
+                        if (activeOrder && activeOrder.items) {
+                            // تحويل الأصناف لمصفوفة سواء كانت Array أو Object لتجنب الانهيار
+                            const itemsArray = Array.isArray(activeOrder.items) ? activeOrder.items : Object.values(activeOrder.items);
+                            count = itemsArray.reduce((acc, item) => acc + (parseInt(item.qty) || 0), 0);
+                        }
+                    } catch (e) { console.warn("تنبيه: فشل حساب أصناف الطاولة", t.id); }
+
+                    const badge = count > 0 ? `<span class="badge-qty">${count}</span>` : '';
+                    
+                    // استدعاء دالة رسم الزر
+                    return generateTableButton(t, badge, tables);
+                }).join('');
+
+                // تحديث العدادات الحية
+                if (typeof updateTablesLiveTimers === "function") updateTablesLiveTimers();
+                
+            } catch (err) {
+                console.error("خطأ رئيسي في الرسم:", err);
+                document.getElementById('tables-container').innerHTML = "<p style='color:white; text-align:center; grid-column:1/-1;'>حدث خطأ أثناء تحميل الطاولات</p>";
+            }
         });
 
         // --- Load Menu Data ---
