@@ -220,10 +220,7 @@
             
             container.innerHTML = orders.map(o => {
                 const items = o.items || [];
-                const orderIdDisplay = o.id ? o.id.toString().slice(-4) : "0000";
-                
-                // حساب الربح
-                const profit = items.reduce((sum, i) => sum + (((parseFloat(i.price)||0) - (parseFloat(i.cost)||0)) * (parseInt(i.qty)||0)), 0);
+                const orderIdDisplay = o.orderNum || "0";
 
                 let statusHTML = '';
                 let statusClass = '';
@@ -272,7 +269,6 @@
                         </div>
                         <div class="info-row" style="margin-top:10px; font-size:1.1rem;">
                             <span>الإجمالي: ${o.total} ج.م</span>
-                            <span style="color:var(--success)">الربح: ${profit.toFixed(2)}</span>
                         </div>
                     </div>
 
