@@ -782,37 +782,43 @@
         async function createNewOrder() {
             if(cart.length === 0) return;
 
-            // سحب الاسم اللي الويتر دخل بيه في شاشة القفل
-            const waiterName = sessionStorage.getItem('currentWaiter');
-            if(!waiterName) {
-                alert("انتهت الجلسة، يرجى تسجيل الخروج والدخول مرة أخرى");
-                return;
-            }
-
-            const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
-
-            const orderData = {
-                tableId: selectedTable,
-                items: cart,
-                status: 'pending',
-                user: waiterName, // ده السطر اللي هيسمع في التقارير
-                time: new Date().toLocaleTimeString('ar-EG'),
-                date: new Date().toLocaleDateString('ar-EG'),
-                timestamp: Date.now(), // مهم جداً للفلتر بالوقت
-                total
-            };
-
             try {
+                // 1. جلب رقم الأوردر الأخير من السيرفر وزيادته
+                const configRef = ref(db, 'config/lastOrderNumber');
+                const snap = await get(configRef);
+                let nextOrderNum = (snap.val() || 0) + 1;
+
+                const waiterName = sessionStorage.getItem('currentWaiter') || "ويتر";
+                const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
+
+                const orderData = {
+                    orderNum: nextOrderNum, // الرقم التسلسلي التلقائي (1, 2, 3...)
+                    tableId: selectedTable,
+                    items: cart,
+                    status: 'pending',
+                    user: waiterName,
+                    time: new Date().toLocaleTimeString('ar-EG'),
+                    date: new Date().toLocaleDateString('ar-EG'),
+                    timestamp: Date.now(),
+                    total
+                };
+
+                // 2. إرسال الأوردر
                 const newOrderRef = await push(ref(db, 'orders'), orderData);
-                // تحديث حالة الطاولة وتوقيت البداية للتايمر
+
+                // 3. تحديث العداد في السيرفر للأوردر القادم
+                await set(configRef, nextOrderNum);
+
+                // 4. تحديث حالة الطاولة
                 await update(ref(db, `tables/${selectedTable}`), {
                     occupied: true,
                     lastOrderTime: Date.now()
                 });
 
                 currentOrderKey = newOrderRef.key;
-                showToast('✅ تم إرسال طلب ' + waiterName + ' للمطبخ');
+                showToast('✅ تم إرسال طلب رقم: ' + nextOrderNum);
                 window.closeCart();
+                window.exitTable();
             } catch (e) {
                 alert("فشل إرسال الطلب: " + e.message);
             }
