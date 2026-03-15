@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>منيو - شيخ البلد</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { 
+            --primary: #b71c1c; 
+            --primary-light: #ffebef;
+            --text: #1f2937;
+            --text-light: #9ca3af;
+            --bg: #f9fafb;
+            --surface: #ffffff;
+            --radius: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Tajawal', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+        /* --- Header --- */
+        header { 
+            background: white; 
+            padding: 20px; 
+            text-align: center; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        header h1 { color: var(--primary); font-size: 24px; font-weight: 900; }
+        header p { font-size: 14px; color: var(--text-light); margin-top: 5px; }
+
+        /* --- Categories --- */
+        .categories { 
+            display: flex; 
+            gap: 10px; 
+            overflow-x: auto; 
+            padding: 15px 20px; 
+            background: white; 
+            scrollbar-width: none; 
+            position: sticky;
+            top: 85px;
+            z-index: 90;
+        }
+        .categories::-webkit-scrollbar { display: none; }
+        .cat-chip { 
+            background: #f3f4f6; 
+            color: var(--text); 
+            padding: 10px 22px; 
+            border-radius: 30px; 
+            font-weight: bold; 
+            font-size: 14px; 
+            white-space: nowrap; 
+            cursor: pointer; 
+            transition: 0.3s; 
+            border: 1px solid transparent; 
+        }
+        .cat-chip.active { background: var(--primary); color: white; }
+
+        /* --- Menu List --- */
+        .menu-scroll { padding: 20px; max-width: 600px; margin: 0 auto; }
+        .food-card { 
+            background: white; 
+            border-radius: 20px; 
+            margin-bottom: 15px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
+            display: flex; 
+            gap: 15px; 
+            padding: 12px; 
+            border: 1px solid #f3f4f6; 
+        }
+        .food-img { width: 90px; height: 90px; border-radius: 14px; object-fit: cover; background: #eee; }
+        .food-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .food-name { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+        .food-cat { font-size: 12px; color: var(--text-light); }
+        .food-price { font-size: 18px; font-weight: 900; color: var(--primary); margin-top: 8px; }
+
+        /* Placeholder for loading */
+        .loading-msg { text-align: center; padding: 50px; color: var(--text-light); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>مطعم شيخ البلد</h1>
+        <p>أهلاً بكم - تصفح قائمة الطعام</p>
+    </header>
+
+    <div class="categories" id="categories-container">
+        <!-- سيتم تحميل الأقسام تلقائياً -->
+    </div>
+
+    <div class="menu-scroll" id="menu-list">
+        <p class="loading-msg">جاري تحميل المنيو...</p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1J7lSkqHHShPlkvtIUwpgmgsGqJ1uhJQ",
+            authDomain: "sheikh-pro-61502.firebaseapp.com",
+            projectId: "sheikh-pro-61502",
+            storageBucket: "sheikh-pro-61502.firebasestorage.app",
+            messagingSenderId: "388665698743",
+            appId: "1:388665698743:web:7eca2bfc0223f9c1736032",
+            measurementId: "G-5F3J5S68LP"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        let globalMenu = [];
+        let allCategories = [];
+
+        // 1. جلب الأقسام والمنيو
+        function initMenu() {
+            // جلب الأقسام
+            onValue(ref(db, 'categories'), (snapshot) => {
+                const data = snapshot.val();
+                allCategories = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                renderCategories();
+            });
+
+            // جلب الأصناف
+            onValue(ref(db, 'menu'), (snapshot) => {
+                const data = snapshot.val();
+                globalMenu = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                renderMenu('all');
+            });
+        }
+
+        // 2. رسم الأقسام
+        function renderCategories() {
+            const container = document.getElementById('categories-container');
+            let html = `<div class="cat-chip active" onclick="window.filterMenu('all')" id="cat-all">الكل</div>`;
+            
+            allCategories.forEach(cat => {
+                if(cat) {
+                    html += `<div class="cat-chip" onclick="window.filterMenu('${cat}')" id="cat-${cat}">${cat}</div>`;
+                }
+            });
+            container.innerHTML = html;
+        }
+
+        // 3. تصفية المنيو
+        window.filterMenu = (category) => {
+            document.querySelectorAll('.cat-chip').forEach(el => el.classList.remove('active'));
+            const activeChip = document.getElementById(`cat-${category}`);
+            if(activeChip) activeChip.classList.add('active');
+            renderMenu(category);
+        };
+
+        // 4. رسم المنيو (بدون زر إضافة)
+        function renderMenu(filterCat) {
+            const menuList = document.getElementById('menu-list');
+            const items = filterCat === 'all' 
+                ? globalMenu 
+                : globalMenu.filter(i => i.cat === filterCat);
+
+            if(items.length === 0) {
+                menuList.innerHTML = '<p class="loading-msg">لا توجد أصناف حالياً</p>';
+                return;
+            }
+
+            menuList.innerHTML = items.filter(i => i.available !== false).map(i => `
+                <div class="food-card">
+                    <img src="${i.img || 'https://via.placeholder.com/150'}" class="food-img" alt="${i.name}">
+                    <div class="food-info">
+                        <div class="food-name">${i.name}</div>
+                        <div class="food-cat">${i.cat}</div>
+                        <div class="food-price">${i.price} ج.م</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // البدء
+        initMenu();
+
+        // حماية بسيطة: منع اليمين والنسخ
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>
